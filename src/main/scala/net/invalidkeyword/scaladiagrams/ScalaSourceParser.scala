@@ -9,14 +9,18 @@ object ScalaSourceParser extends RegexParsers with RunParser {
   val ignored = """\S""".r ^^ {case ig => IGNORED}
   
   val wordExp= """\w+""".r ^^ {case word => word}
-  
+
   val packageExp = """[\w.]+""".r
+  val valueAssignExp = """[\w. :=]+new[ ]+""".r
 
   val bracketOpen = "("
   val brackets = """\([^\)]*\)""".r
   val bracketClose = ")"
 
   val wordPackage = "package "
+  val wordVal = "var "
+  val wordVar = "val "
+
   val wordClass = "class "
   val wordCase = "case class "
   val wordTrait = "trait "
@@ -33,12 +37,15 @@ object ScalaSourceParser extends RegexParsers with RunParser {
   val typeName = """[\w\[\]]+""".r ^^ {case word => word}
   val argumentSeparator = ","
 
+
   def packageGroup = wordPackage~packageExp ^^ {case pre~name => name}
-    
+  def valueGroup = (wordVal|wordVar)~valueAssignExp~wordExp~opt(brackets)  ^^ {case pre~value~name~brackets => VALCLASS(name,List(RELATED(value, false)))}
+
   def classGroup : Parser[KEYWORD] = wordClass~wordExp~related ^^ {case pre~name~related => CLASS(name,related)}
   def traitGroup : Parser[KEYWORD] = wordTrait~wordExp~related ^^ {case pre~name~related => TRAIT(name,related)} 
   def objectGroup : Parser[KEYWORD] = wordObject~wordExp~related ^^ {case pre~name~related => OBJECT(name,related)} 
   def caseGroup : Parser[KEYWORD] = wordCase~wordExp~opt(brackets)~related ^^ {case pre~name~brackets~related => CASE(name,related)}
+
   
   def withGroup = (wordExtends|wordWith)~wordExp ^^ {case pre~name => RELATED(name)}
   def selfGroup = (wordSelf|wordExtends|wordWith)~wordExp ^^ {case pre~name => RELATED(name,true)}
@@ -46,21 +53,24 @@ object ScalaSourceParser extends RegexParsers with RunParser {
   def argumentTypeGroup = beforeArgumentType ~> typeName <~ opt(afterArgumentType) <~ opt(argumentSeparator) ^^ {case name => RELATED(name)}
   def argumentListTypes = bracketOpen ~> rep(argumentTypeGroup) <~ bracketClose
 
+
+
   def related = opt(argumentListTypes)~rep(withGroup)~opt(optionalSelf) ^^ {case types~withs~self => types.getOrElse(Nil) ++ withs ++ self.getOrElse(Nil)}
     
-  def parsable : Parser[List[KEYWORD]] = opt(packageGroup)~rep(caseGroup|classGroup|traitGroup|objectGroup|ignored) ^^ {
+  def parsable : Parser[List[KEYWORD]] = opt(packageGroup)~rep(caseGroup|classGroup|traitGroup|objectGroup|valueGroup|ignored) ^^ {
     case pack~groups => 
       groups.filter(i=>i != IGNORED).map{
+        case VALCLASS(n,r,_) => VALCLASS(n,r,pack.getOrElse(""))
         case CLASS(n,r,_) => CLASS(n,r,pack.getOrElse(""))
         case TRAIT(n,r,_) => TRAIT(n,r,pack.getOrElse(""))
         case OBJECT(n,r,_) => OBJECT(n,r,pack.getOrElse(""))
         case CASE(n,r,_) => CASE(n,r,pack.getOrElse(""))
       }
   }
- 
   def root = parsable 
   
   type RootType = List[KEYWORD]
+
   
   def filter(matches : List[KEYWORD]) : List[TYPE] = matches.asInstanceOf[List[TYPE]]
   
@@ -72,7 +82,7 @@ trait RunParser {
   def root: Parser[RootType]
   def run(in: String): ParseResult[RootType] = parseAll(root, in)
 }
-
+// https://www.doctormckay.com/morecolors.php <- colors
 case class CASE(override val name : String, withs : List[RELATED], pack : String="") extends TYPE(name,withs,pack) {
   override val color = "burlywood"
 }
@@ -85,6 +95,10 @@ case class CLASS(override val name : String, withs : List[RELATED], pack : Strin
 
 case class TRAIT(override val name : String, withs : List[RELATED], pack : String="") extends TYPE(name,withs,pack) {
   override val color = "cadetblue"
+}
+
+case class VALCLASS(override val name : String, withs : List[RELATED], pack : String="") extends TYPE(name,withs,pack) {
+  override val color = "palegreen"
 }
 
 case class RELATED(override val name : String, self : Boolean = false) extends KEYWORD {

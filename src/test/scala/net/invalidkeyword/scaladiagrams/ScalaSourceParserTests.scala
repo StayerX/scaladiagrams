@@ -21,6 +21,12 @@ class ScalaSourceParserTests extends FlatSpec with Matchers {
       ScalaSourceParser.filter(result.get) should be(List())
     }
 
+  it should " parse a value assign and return the class" in {
+      val result = ScalaSourceParser.run("val Bob : String = new Parser")
+      result.successful should be(true)
+      ScalaSourceParser.filter(result.get) should be(List(VALCLASS("Parser",List(RELATED("Bob : String = new ")))))
+    }
+
     it should " parse a class arguments with default values" in {
       val result = ScalaSourceParser.run("class Bob (a : String = \"string\")")
       result.successful should be(true)
