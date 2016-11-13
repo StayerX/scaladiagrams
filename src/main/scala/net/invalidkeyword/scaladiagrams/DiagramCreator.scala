@@ -1,9 +1,13 @@
 package net.invalidkeyword.scaladiagrams
 
 import java.io.File
+
 import org.rogach.scallop._
 import java.io.OutputStream
 import java.io.OutputStreamWriter
+import java.text.Normalizer
+
+import scala.io.BufferedSource
 
 /*
 
@@ -27,11 +31,12 @@ object DiagramCreator {
       val linked = opt[Boolean]("linked", descr = "only output types that extend other types")
       val parent = opt[String]("parent", descr = "only output parents of a particular class")
     }
-    
+
+    //System.out.println("Prior00")
     val files = new InputFinder().files(Config.source(),Config.extension())
-    System.out.println("Prior1")
+    //System.out.println("Prior1")
     val allNodes = getNodesFromFiles(files)
-    System.out.println("Posterior1")
+    //System.out.println("Posterior1")
     val ns = new NodeSelector(allNodes)
     
     if(!Config.parent.isEmpty)
@@ -47,16 +52,28 @@ object DiagramCreator {
     nodes.foreach(println _)
     println ("}")  
   }
-  
-  def fileToString(file : File) = {scala.io.Source.fromFile(file).mkString}
+
+  def fileToString(file : File) = {
+    val source = scala.io.Source.fromFile(file)("UTF-8")
+    //source.getLines mkString "\n"
+    var text: String = source.mkString
+    //System.out.println("h3")
+    text = Normalizer.normalize(text, Normalizer.Form.NFD)
+    //System.out.println("h4")
+    //System.out.println(text)
+    //System.out.println("h5")
+    text
+  }
   
   def parseFile(file : File) = {
+    //System.out.println("Prior2.1: " + file.getAbsoluteFile().toString)
     val result = ScalaSourceParser.run(fileToString(file))
+    //System.out.println("Prior2.2: " + file.getAbsoluteFile().toString)
     ScalaSourceParser.filter(result.get)
   }
   
   def getNodesFromFiles(files: Array[File]) = {
-    System.out.println("Prior2")
+    //System.out.println("Prior2")
     files.map(parseFile(_)).flatten.toList
   }
   
