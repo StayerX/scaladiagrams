@@ -69,7 +69,9 @@ object DiagramCreator {
     //System.out.println("Prior2.1: " + file.getAbsoluteFile().toString)
     val result = ScalaSourceParser.run(fileToString(file))
     //System.out.println("Prior2.2: " + file.getAbsoluteFile().toString)
-    ScalaSourceParser.filter(result.get)
+    val filteredResult = ScalaSourceParser.filter(result.get)
+    val className: String = file.getName().replaceAll("\\.[^.]*$", "")
+    ScalaSourceParser.updateValueNodes(filteredResult,className)
   }
   
   def getNodesFromFiles(files: Array[File]) = {

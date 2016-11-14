@@ -39,7 +39,7 @@ object ScalaSourceParser extends RegexParsers with RunParser {
 
 
   def packageGroup = wordPackage~packageExp ^^ {case pre~name => name}
-  def valueGroup = (wordVal|wordVar)~valueAssignExp~wordExp~opt(brackets)  ^^ {case pre~value~name~brackets => VALCLASS(name,List(RELATED(value, false)))}
+  def valueGroup = (wordVal|wordVar)~valueAssignExp~wordExp~opt(brackets)  ^^ {case pre~value~name~brackets => VALCLASS(name,List(RELATED("customClassName")),"customClassName")}
 
   def classGroup : Parser[KEYWORD] = wordClass~wordExp~related ^^ {case pre~name~related => CLASS(name,related)}
   def traitGroup : Parser[KEYWORD] = wordTrait~wordExp~related ^^ {case pre~name~related => TRAIT(name,related)} 
@@ -71,9 +71,30 @@ object ScalaSourceParser extends RegexParsers with RunParser {
   
   type RootType = List[KEYWORD]
 
-  
   def filter(matches : List[KEYWORD]) : List[TYPE] = matches.asInstanceOf[List[TYPE]]
-  
+
+  def updateValueNodes(nodes: List[TYPE], fileName: String): List[TYPE] ={
+    val allNodesList = scala.collection.mutable.Stack[TYPE]()
+    for (node: TYPE <- nodes){
+      val childrenNodeList = scala.collection.mutable.Stack[RELATED]()
+      var isValueNode = false
+      for (childNode:RELATED <- node.children){
+        if(childNode.name.equals("customClassName")){
+          childrenNodeList.push(RELATED(fileName))
+          isValueNode = true
+        }else{
+          childrenNodeList.push(childNode)
+        }
+      }
+      /* All this because TYPE is not modifiable */
+      if (isValueNode) {
+        allNodesList.push(VALCLASS(node.name,childrenNodeList.toList))
+      }else {
+        allNodesList.push(node)
+      }
+    }
+    allNodesList.toList
+  }
 }
 
 trait RunParser {
@@ -97,7 +118,7 @@ case class TRAIT(override val name : String, withs : List[RELATED], pack : Strin
   override val color = "cadetblue"
 }
 
-case class VALCLASS(override val name : String, withs : List[RELATED], pack : String="") extends TYPE(name,withs,pack) {
+case class VALCLASS(override val name : String,var withs : List[RELATED], pack : String="") extends TYPE(name,withs,pack) {
   override val color = "palegreen"
 }
 
@@ -108,11 +129,11 @@ case class RELATED(override val name : String, self : Boolean = false) extends K
 object IGNORED extends KEYWORD
 
 abstract class TYPE(override val name : String, withs : List[RELATED], pack : String ="") extends KEYWORD {
-  
+
   def node = quoted(name) + " [style=filled, fillcolor=" + color + "]"
   override def toString = node + withs.map(a=> quoted(name) + " -> " + quoted(a.name) + a.relationType).mkString("\n  ","\n  ","\n")
   val color = "white"
-    
+
   override lazy val hasChildren = withs.nonEmpty
   def children = withs
   
